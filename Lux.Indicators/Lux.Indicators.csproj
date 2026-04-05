@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    
+    <!-- NuGet Package Properties -->
+    <PackageId>Lux.Indicators</PackageId>
+    <PackageVersion>1.0.0</PackageVersion>
+    <Authors>Lux Team</Authors>
+    <Company>Lux</Company>
+    <Description>A comprehensive technical indicators library for stock analysis, including MACD, KDJ, Bollinger Bands, and Moving Average calculations.</Description>
+    <Copyright>Copyright © Lux 2026</Copyright>
+    <PackageTags>stock indicators;technical-analysis;financial-analysis;trading;finance;macd;kdj;bollinger-bands;moving-average</PackageTags>
+    <RepositoryUrl>https://github.com/lux/indicators</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <!-- 允许Debug版本生成包 -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+</Project>

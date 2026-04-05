@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Lux.Indicators.Demo/Lux.Indicators.Demo.csproj" />
+  <Project Path="Lux.Indicators/Lux.Indicators.csproj" />
+</Solution>

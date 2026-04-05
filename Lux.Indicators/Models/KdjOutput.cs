@@ -1,0 +1,61 @@
+using System;
+
+namespace Lux.Indicators.Models
+{
+    /// <summary>
+    /// KDJ指标分析结果
+    /// </summary>
+    public class KdjOutput
+    {
+        /// <summary>
+        /// K值
+        /// </summary>
+        public decimal K { get; set; }
+        
+        /// <summary>
+        /// D值
+        /// </summary>
+        public decimal D { get; set; }
+        
+        /// <summary>
+        /// J值
+        /// </summary>
+        public decimal J { get; set; }
+        
+        /// <summary>
+        /// 信号类型
+        /// </summary>
+        public KdjSignalType Signal { get; set; }
+    }
+    
+    /// <summary>
+    /// KDJ信号类型
+    /// </summary>
+    public enum KdjSignalType
+    {
+        /// <summary>
+        /// 无信号
+        /// </summary>
+        None,
+        
+        /// <summary>
+        /// 超卖区买入信号
+        /// </summary>
+        OversoldBuy,
+        
+        /// <summary>
+        /// 超买区卖出信号
+        /// </summary>
+        OverboughtSell,
+        
+        /// <summary>
+        /// K线上穿D线 (金叉)
+        /// </summary>
+        GoldenCross,
+        
+        /// <summary>
+        /// K线下穿D线 (死叉)
+        /// </summary>
+        DeathCross
+    }
+}
