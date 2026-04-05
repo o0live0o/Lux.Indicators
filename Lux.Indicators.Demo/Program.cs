@@ -21,14 +21,14 @@ namespace Lux.Indicators.Demo
             Console.WriteLine("Lux.Indicators - 股票技术指标计算库");
             Console.WriteLine("===================================");
             var minutes = ReadTsv();
-            var lastMinutes = minutes.TakeLast(268).ToArray();
-            var lastMinutesClose = lastMinutes.Select(p => p.Open);
+            var lastMinutes = minutes.TakeLast(300).ToArray();
+            var lastMinutesClose = lastMinutes.Select(p => p.Close);
             var macdResultsPure1 = MacdAnalyzer.Analyze(lastMinutesClose.ToList(), 12, 26, 9).ToArray();
             var lastMinutesCloseArr = lastMinutesClose.ToArray();
-            using StreamWriter sw = new StreamWriter("open_macd.tsv");
+            using StreamWriter sw = new StreamWriter("close_macd.tsv");
             for (int i = 0; i < lastMinutes.Length; i++)
             {
-                sw.WriteLine($"{lastMinutes[i].Date.ToString("yyyy-MM-dd")}\t{lastMinutesCloseArr[i].ToString()}\t{macdResultsPure1[i].Dea.ToString()}\t{macdResultsPure1[i].Dif.ToString()}\t{macdResultsPure1[i].Histogram.ToString()}\t{macdResultsPure1[i].Signal.ToString()}");
+                sw.WriteLine($"{lastMinutes[i].Date.ToString("yyyy-MM-dd")}\t{lastMinutesCloseArr[i].ToString()}\t{macdResultsPure1[i].Dif.ToString()}\t{macdResultsPure1[i].Dea.ToString()}\t{macdResultsPure1[i].Histogram.ToString()}\t{macdResultsPure1[i].Signal.ToString()}");
             }
 
             // 创建模拟股票数据

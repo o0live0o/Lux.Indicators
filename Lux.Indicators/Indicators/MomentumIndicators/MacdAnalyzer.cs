@@ -42,6 +42,12 @@ namespace Lux.Indicators.MomentumIndicators
                 return results;
             }
             
+            // 确保周期参数合理
+            if (fastPeriod <= 0 || slowPeriod <= 0 || signalPeriod <= 0 || fastPeriod >= slowPeriod)
+            {
+                throw new ArgumentException("MACD参数必须满足: 0 < fastPeriod < slowPeriod 且 signalPeriod > 0");
+            }
+            
             // 计算快速EMA
             var fastEMA = IndicatorCalculator.CalculateEMA(closePrices, fastPeriod);
             
@@ -52,12 +58,14 @@ namespace Lux.Indicators.MomentumIndicators
             var difValues = new List<decimal>();
             for (int i = 0; i < closePrices.Count; i++)
             {
-                if (i >= slowPeriod - 1) // 确保两个EMA都有有效值
+                // 只有当两个EMA都有有效值时才计算DIF
+                if (i >= Math.Max(fastPeriod - 1, slowPeriod - 1))
                 {
                     difValues.Add(fastEMA[i] - slowEMA[i]);
                 }
                 else
                 {
+                    // 在初始阶段，填充0表示暂无有效值
                     difValues.Add(0);
                 }
             }
@@ -65,17 +73,20 @@ namespace Lux.Indicators.MomentumIndicators
             // 计算DEA线 (DIF的EMA)
             var deaValues = IndicatorCalculator.CalculateEMA(difValues, signalPeriod);
             
-            // 计算MACD柱状图
+            // 计算MACD柱状图及信号
             for (int i = 0; i < closePrices.Count; i++)
             {
                 var dif = difValues[i];
                 var dea = deaValues[i];
+                
+                // 计算柱状图 (通常为 2*(DIF-DEA)，不同软件可能有不同的倍数)
                 var histogram = 2 * (dif - dea);
                 
                 MacdSignalType signal = MacdSignalType.None;
                 
-                // 判断是否产生金叉或死叉信号
-                if (i > 0 && deaValues[i-1] != 0 && deaValues[i] != 0)
+                // 判断金叉或死叉信号
+                // 仅在DIF和DEA都有有效值（非零）且至少有两个数据点时判断交叉
+                if (i > Math.Max(Math.Max(fastPeriod, slowPeriod), signalPeriod) - 1 && i > 0)
                 {
                     var prevDif = difValues[i - 1];
                     var currDif = dif;
