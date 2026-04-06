@@ -10,6 +10,12 @@ using Lux.Indicators.VolatileIndicators;
 using Lux.Indicators.DivergenceDetectors;
 using System.Text;
 using Lux.Indicators.Demo.Examples;
+using Lux.Indicators.Demo.Strategies;
+using Lux.Indicators.Demo.Management;
+using Lux.Indicators.Demo.Traders;
+using Lux.Indicators.Demo.Providers;
+using Lux.Indicators.Demo.Aggregation;
+using Lux.Indicators.Demo.Managers;
 
 namespace Lux.Indicators.Demo
 {
@@ -24,16 +30,19 @@ namespace Lux.Indicators.Demo
             Console.WriteLine("===================================");
             
             // 运行交易模拟
-            RunTradingSimulation();
+            // RunTradingSimulation();
 
             // 运行交易员系统示例
-            await RunTraderSystemExample();
+            // await RunTraderSystemExample();
             
             // 运行高级智能交易系统示例
-            await RunAdvancedIntelligentTradingExample();
+            // await RunAdvancedIntelligentTradingExample();
 
             // 运行技术指标分析测试
             // RunTechnicalAnalysisTests();
+            
+            // 运行日内交易模拟 - 使用最终交易中心版本
+            await RunIntradayTradingSimulation();
 
             Console.WriteLine("\n计算完成！");
         }
@@ -229,6 +238,62 @@ namespace Lux.Indicators.Demo
         }
 
         /// <summary>
+        /// 运行日内交易模拟 - 使用最终交易中心版本
+        /// </summary>
+        private static async Task RunIntradayTradingSimulation()
+        {
+            Console.WriteLine("\n运行日内交易模拟 (使用最终交易中心版本)...");
+
+            // 读取TSV数据
+            var stockDataList = ReadTsv();
+            string stockCode = "600001"; // 使用600001作为股票代码
+
+            // 使用与RunTradingSimulation相同的方式创建模拟器
+            var intradayStrategy = new IntradayTradingStrategy();
+            var positionManagement = new IntradayPositionManagement(); // 使用日内仓位管理
+
+            // 创建与RunTradingSimulation相同的模拟器
+            var simulator = new TradingSimulator(100000m, intradayStrategy, positionManagement);
+            
+            Console.WriteLine($"已创建日内交易模拟器，初始资金: 100,000.00");
+            Console.WriteLine($"股票代码: {stockCode}");
+            Console.WriteLine($"数据点数量: {stockDataList.Count}");
+
+            // 运行模拟
+            simulator.RunSimulation(stockDataList, stockCode);
+
+            // 获取结果
+            var tradingResult = simulator.GetResult();
+            
+            Console.WriteLine($"\n=== 日内交易结果 ===");
+            Console.WriteLine($"初始资金: {tradingResult.InitialBalance:N2}");
+            Console.WriteLine($"最终资金: {tradingResult.FinalBalance:N2}");
+            Console.WriteLine($"盈亏金额: {tradingResult.Profit:N2}");
+            Console.WriteLine($"盈亏比例: {tradingResult.ProfitPercentage:N2}%");
+            Console.WriteLine($"总交易次数: {tradingResult.TotalTrades}");
+
+            // 显示交易记录
+            if (tradingResult.Trades.Count > 0)
+            {
+                Console.WriteLine($"\n交易记录 (仅显示前5笔):");
+                var limitedTrades = tradingResult.Trades.Take(5).ToList();
+                foreach (var trade in limitedTrades)
+                {
+                    string actionText = trade.Action == TradeAction.Buy ? "买入" : "卖出";
+                    Console.WriteLine($"  {trade.DateTime:yyyy-MM-dd HH:mm} {trade.StockCode} {actionText} 价格:{trade.Price:F2} 数量:{trade.Shares} 金额:{trade.Amount:N2} 余额:{trade.BalanceAfter:N2}");
+                    Console.WriteLine($"    信号详情: {trade.SignalDetails}");
+                }
+                
+                if (tradingResult.Trades.Count > 5)
+                {
+                    Console.WriteLine($"    ... 还有 {tradingResult.Trades.Count - 5} 笔交易");
+                }
+            }
+
+            Console.WriteLine("日内交易模拟完成。");
+        }
+
+        /// <summary>
         /// 运行交易员系统示例
         /// </summary>
         private static async Task RunTraderSystemExample()
@@ -407,6 +472,223 @@ namespace Lux.Indicators.Demo
             {
                 Console.WriteLine($"计算过程中发生错误: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// 计算MACD指标 - 简化版本以提高性能
+        /// </summary>
+        private static MacdOutput CalculateMacd(List<StockData> historicalData)
+        {
+            if (historicalData.Count < 26) // MACD至少需要26个数据点
+            {
+                return new MacdOutput { Dif = 0, Dea = 0, Histogram = 0, Signal = MacdSignalType.None };
+            }
+
+            // 获取最近的数据点用于计算
+            var recentData = historicalData.TakeLast(26).ToList();
+            var prices = recentData.Select(d => d.Close).ToList();
+            
+            // 计算EMA12 (快速线) - 使用简化的计算方式
+            decimal ema12 = prices.Skip(Math.Max(0, prices.Count - 12)).DefaultIfEmpty(0).Average();
+            // 计算EMA26 (慢速线) - 使用简化的计算方式
+            decimal ema26 = prices.Skip(Math.Max(0, prices.Count - 26)).DefaultIfEmpty(0).Average();
+            
+            // DIF = EMA12 - EMA26
+            decimal dif = ema12 - ema26;
+            
+            // 简化DEA计算
+            decimal dea = (dif + ema12 - ema26) / 2;
+            
+            // BAR = (DIF - DEA) * 2
+            decimal histogram = (dif - dea) * 2;
+
+            // 计算信号类型
+            MacdSignalType signal = MacdSignalType.None;
+            if (historicalData.Count >= 27) // 需要至少27个数据点才能比较当前和前一个状态
+            {
+                // 获取前一个状态的计算结果（使用前26个数据点）
+                var prevRecentData = historicalData.TakeLast(27).Take(26).ToList(); // 前一个26个数据点
+                var prevPrices = prevRecentData.Select(d => d.Close).ToList();
+                
+                decimal prevEma12 = prevPrices.Skip(Math.Max(0, prevPrices.Count - 12)).DefaultIfEmpty(0).Average();
+                decimal prevEma26 = prevPrices.Skip(Math.Max(0, prevPrices.Count - 26)).DefaultIfEmpty(0).Average();
+                
+                decimal prevDif = prevEma12 - prevEma26;
+                decimal prevDea = (prevDif + prevEma12 - prevEma26) / 2;
+                
+                // 金叉：DIF从下方穿越DEA
+                if (prevDif <= prevDea && dif > dea)
+                {
+                    signal = MacdSignalType.GoldenCross;
+                }
+                // 死叉：DIF从上方穿越DEA
+                else if (prevDif >= prevDea && dif < dea)
+                {
+                    signal = MacdSignalType.DeathCross;
+                }
+            }
+
+            return new MacdOutput { Dif = dif, Dea = dea, Histogram = histogram, Signal = signal };
+        }
+
+        /// <summary>
+        /// 计算KDJ指标 - 简化版本以提高性能
+        /// </summary>
+        private static KdjOutput CalculateKdj(List<StockData> historicalData)
+        {
+            if (historicalData.Count < 9) // KDJ至少需要9个数据点
+            {
+                return new KdjOutput { K = 50, D = 50, J = 50, Signal = KdjSignalType.None };
+            }
+
+            // 取最近9天的数据
+            var recentData = historicalData.TakeLast(9).ToList();
+            
+            // 计算最高价和最低价
+            decimal highestHigh = recentData.Max(d => d.High);
+            decimal lowestLow = recentData.Min(d => d.Low);
+            var currentData = historicalData.Last();
+
+            // 如果最高价等于最低价，则无法计算
+            if (highestHigh == lowestLow)
+            {
+                return new KdjOutput { K = 50, D = 50, J = 50, Signal = KdjSignalType.None };
+            }
+
+            // 计算RSV
+            decimal rsv = ((currentData.Close - lowestLow) / (highestHigh - lowestLow)) * 100;
+
+            // 使用当前RSV值作为基础，避免递归计算
+            decimal k = Math.Max(0, Math.Min(100, 2.0m/3.0m * 50 + 1.0m/3.0m * rsv)); // 简化K值计算
+            decimal d = Math.Max(0, Math.Min(100, 2.0m/3.0m * 50 + 1.0m/3.0m * k));   // 简化D值计算
+            decimal j = Math.Max(0, Math.Min(100, 3 * k - 2 * d));                      // J值计算
+
+            // 计算信号类型
+            KdjSignalType signal = KdjSignalType.None;
+            if (historicalData.Count >= 10) // 需要至少10个数据点才能比较当前和前一个状态
+            {
+                // 计算前一个状态的K、D值
+                var prevRecentData = historicalData.TakeLast(10).Take(9).ToList(); // 前一个9个数据点
+                decimal prevHighestHigh = prevRecentData.Max(d => d.High);
+                decimal prevLowestLow = prevRecentData.Min(d => d.Low);
+                var prevCurrentData = historicalData[historicalData.Count - 2]; // 前一个数据点
+
+                if (prevHighestHigh != prevLowestLow) // 确保分母不为0
+                {
+                    decimal prevRsv = ((prevCurrentData.Close - prevLowestLow) / (prevHighestHigh - prevLowestLow)) * 100;
+                    decimal prevK = Math.Max(0, Math.Min(100, 2.0m/3.0m * 50 + 1.0m/3.0m * prevRsv));
+                    decimal prevD = Math.Max(0, Math.Min(100, 2.0m/3.0m * 50 + 1.0m/3.0m * prevK));
+
+                    // 金叉：K线从下方穿越D线
+                    if (prevK <= prevD && k > d)
+                    {
+                        signal = KdjSignalType.GoldenCross;
+                    }
+                    // 死叉：K线从上方穿越D线
+                    else if (prevK >= prevD && k < d)
+                    {
+                        signal = KdjSignalType.DeathCross;
+                    }
+                }
+            }
+
+            return new KdjOutput { K = k, D = d, J = j, Signal = signal };
+        }
+
+        /// <summary>
+        /// 计算移动平均线
+        /// </summary>
+        private static MovingAverageOutput CalculateMovingAverage(List<StockData> historicalData)
+        {
+            if (historicalData.Count < 5) // 至少需要5个数据点来计算有效均线
+            {
+                var currentClose = historicalData.LastOrDefault()?.Close ?? 0;
+                return new MovingAverageOutput { ShortMa = currentClose, LongMa = currentClose, Signal = MovingAverageSignalType.None };
+            }
+
+            var prices = historicalData.Select(d => d.Close).ToList();
+            
+            // 计算短期均线 (5日)
+            int shortPeriod = Math.Min(5, prices.Count);
+            decimal shortMa = prices.Skip(Math.Max(0, prices.Count - shortPeriod)).DefaultIfEmpty(0).Average();
+            
+            // 计算长期均线 (20日)
+            int longPeriod = Math.Min(20, prices.Count);
+            decimal longMa = prices.Skip(Math.Max(0, prices.Count - longPeriod)).DefaultIfEmpty(0).Average();
+
+            // 计算信号类型
+            MovingAverageSignalType signal = MovingAverageSignalType.None;
+            if (historicalData.Count >= 6) // 需要至少6个数据点才能比较当前和前一个状态
+            {
+                // 计算前一个状态的均线
+                var prevPrices = historicalData.Take(historicalData.Count - 1).Select(d => d.Close).ToList();
+                
+                int prevShortPeriod = Math.Min(5, prevPrices.Count);
+                decimal prevShortMa = prevPrices.Skip(Math.Max(0, prevPrices.Count - prevShortPeriod)).DefaultIfEmpty(0).Average();
+                
+                int prevLongPeriod = Math.Min(20, prevPrices.Count);
+                decimal prevLongMa = prevPrices.Skip(Math.Max(0, prevPrices.Count - prevLongPeriod)).DefaultIfEmpty(0).Average();
+
+                bool currShortAboveLong = shortMa > longMa;
+                bool prevShortAboveLong = prevShortMa > prevLongMa;
+
+                // 多头排列：短期均线上穿长期均线
+                if (!prevShortAboveLong && currShortAboveLong)
+                {
+                    signal = MovingAverageSignalType.Bullish;
+                }
+                // 空头排列：短期均线下穿长期均线
+                else if (prevShortAboveLong && !currShortAboveLong)
+                {
+                    signal = MovingAverageSignalType.Bearish;
+                }
+            }
+
+            return new MovingAverageOutput { ShortMa = shortMa, LongMa = longMa, Signal = signal };
+        }
+
+        /// <summary>
+        /// 计算RSI指标 - 简化版本以提高性能
+        /// </summary>
+        private static decimal CalculateRsi(List<StockData> historicalData)
+        {
+            if (historicalData.Count < 14) // RSI需要至少14天数据
+            {
+                return 50; // 返回中性值
+            }
+
+            // 取最近14天的数据
+            var recentPrices = historicalData.TakeLast(14).Select(d => d.Close).ToList();
+            
+            decimal gainSum = 0;
+            decimal lossSum = 0;
+            
+            for (int i = 1; i < recentPrices.Count; i++)
+            {
+                decimal change = recentPrices[i] - recentPrices[i - 1];
+                if (change > 0)
+                {
+                    gainSum += change;
+                }
+                else
+                {
+                    lossSum += Math.Abs(change);
+                }
+            }
+            
+            int periods = recentPrices.Count - 1;
+            if (periods <= 0) return 50;
+            
+            decimal avgGain = gainSum / periods;
+            decimal avgLoss = lossSum / periods;
+            
+            if (avgLoss == 0) return 100; // 完全上涨
+            if (avgGain == 0) return 0;   // 完全下跌
+            
+            decimal rs = avgGain / avgLoss;
+            decimal rsi = 100 - (100 / (1 + rs));
+
+            return Math.Max(0, Math.Min(100, rsi));
         }
     }
 }
