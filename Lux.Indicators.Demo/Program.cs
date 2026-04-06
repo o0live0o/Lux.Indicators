@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Lux.Indicators;
 using Lux.Indicators.Models;
 using Lux.Indicators.Options;
@@ -8,6 +9,7 @@ using Lux.Indicators.MomentumIndicators;
 using Lux.Indicators.VolatileIndicators;
 using Lux.Indicators.DivergenceDetectors;
 using System.Text;
+using Lux.Indicators.Demo.Examples;
 
 namespace Lux.Indicators.Demo
 {
@@ -16,13 +18,19 @@ namespace Lux.Indicators.Demo
     /// </summary>
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             Console.WriteLine("Lux.Indicators - 股票技术指标计算库");
             Console.WriteLine("===================================");
             
             // 运行交易模拟
             RunTradingSimulation();
+
+            // 运行交易员系统示例
+            await RunTraderSystemExample();
+            
+            // 运行高级智能交易系统示例
+            await RunAdvancedIntelligentTradingExample();
 
             // 运行技术指标分析测试
             // RunTechnicalAnalysisTests();
@@ -164,65 +172,80 @@ namespace Lux.Indicators.Demo
         {
             var minutes = ReadTsv();
             var lastMinutes = minutes.TakeLast(300).ToArray();
-            var lastMinutesClose = lastMinutes.Select(p => p.Close).ToList();
-            var macdResultsPure1 = MacdAnalyzer.Analyze(lastMinutesClose, 12, 26, 9);
-            
-            // 计算MACD背离，使用更敏感的参数以适应分钟级数据
-            var macdDivergences = MacdDivergenceAnalyzer.FindDivergences(lastMinutesClose, macdResultsPure1, lookbackPeriod: 3, threshold: 0.01m);
-            
-            // 创建背离字典以便快速查找
-            var divergenceDict = new Dictionary<int, DivergenceCommon.DivergencePoint>();
-            foreach (var div in macdDivergences)
+            string stockCode = "600001"; // 确保有正确的股票代码
+
+            // 创建不同策略和仓位管理组合的模拟器进行比较
+            var simulationConfigs = new[]
             {
-                divergenceDict[div.PricePeakIndex] = div;
-            }
+                new { Strategy = (ITradingStrategy)new ShortTermTradingStrategy(), PositionManagement = (IPositionManagement)new ConservativePositionManagement(), Name = "短期交易+保守仓位" },
+                new { Strategy = (ITradingStrategy)new ShortTermTradingStrategy(), PositionManagement = (IPositionManagement)new AggressivePositionManagement(), Name = "短期交易+积极仓位" },
+                new { Strategy = (ITradingStrategy)new ShortTermTradingStrategy(), PositionManagement = (IPositionManagement)new BalancedPositionManagement(), Name = "短期交易+平衡仓位" },
+                new { Strategy = (ITradingStrategy)new LongTermInvestmentStrategy(), PositionManagement = (IPositionManagement)new ConservativePositionManagement(), Name = "长期投资+保守仓位" },
+                new { Strategy = (ITradingStrategy)new LongTermInvestmentStrategy(), PositionManagement = (IPositionManagement)new AggressivePositionManagement(), Name = "长期投资+积极仓位" },
+                new { Strategy = (ITradingStrategy)new LongTermInvestmentStrategy(), PositionManagement = (IPositionManagement)new BalancedPositionManagement(), Name = "长期投资+平衡仓位" },
+                new { Strategy = (ITradingStrategy)new SwingTradingStrategy(), PositionManagement = (IPositionManagement)new ConservativePositionManagement(), Name = "波段交易+保守仓位" },
+                new { Strategy = (ITradingStrategy)new SwingTradingStrategy(), PositionManagement = (IPositionManagement)new AggressivePositionManagement(), Name = "波段交易+积极仓位" },
+                new { Strategy = (ITradingStrategy)new SwingTradingStrategy(), PositionManagement = (IPositionManagement)new BalancedPositionManagement(), Name = "波段交易+平衡仓位" }
+            };
+
+            Console.WriteLine("\n12. 交易模拟 (策略+仓位管理组合对比):");
             
-            var lastMinutesCloseArr = lastMinutesClose.ToArray();
-            using StreamWriter sw = new StreamWriter("close_macd.tsv");
-            sw.WriteLine("Date\tClose\tDIF\tDEA\tHistogram\tSignal\tDivergenceType\tDivergenceDescription"); // 写入表头
-            for (int i = 0; i < lastMinutes.Length; i++)
+            foreach (var config in simulationConfigs)
             {
-                string divergenceType = "";
-                string divergenceDescription = "";
-                
-                // 检查是否存在背离点，注意背离分析可能需要一定数据量才开始工作
-                if (divergenceDict.ContainsKey(i))
+                Console.WriteLine($"\n--- {config.Name} ---");
+                var simulator = new TradingSimulator(100000m, config.Strategy, config.PositionManagement); // 使用指定策略和仓位管理
+                Console.WriteLine($"{config.Name}模拟器已创建，开始运行模拟...");
+                simulator.RunSimulation(lastMinutes.ToList(), stockCode);
+                Console.WriteLine("模拟运行完成，正在获取结果...");
+
+                var tradingResult = simulator.GetResult();
+                Console.WriteLine($"  初始资金: {tradingResult.InitialBalance:N2}");
+                Console.WriteLine($"  最终资金: {tradingResult.FinalBalance:N2}");
+                Console.WriteLine($"  盈亏金额: {tradingResult.Profit:N2}");
+                Console.WriteLine($"  盈亏比例: {tradingResult.ProfitPercentage:N2}%");
+                Console.WriteLine($"  总交易次数: {tradingResult.TotalTrades}");
+
+                Console.WriteLine("\n  交易记录 (仅显示前5笔):");
+                var limitedTrades = tradingResult.Trades.Take(5).ToList();
+                foreach (var trade in limitedTrades)
                 {
-                    var divergence = divergenceDict[i];
-                    divergenceType = divergence.Type.ToString();
-                    divergenceDescription = divergence.Description.Replace("\t", " ").Replace("\n", " "); // 避免制表符冲突
+                    string actionText = trade.Action == TradeAction.Buy ? "买入" : "卖出";
+                    Console.WriteLine($"    {trade.DateTime:yyyy-MM-dd HH:mm} {trade.StockCode} {actionText} 价格:{trade.Price:F2} 数量:{trade.Shares} 金额:{trade.Amount:N2} 余额:{trade.BalanceAfter:N2}");
+                    Console.WriteLine($"      信号详情: {trade.SignalDetails}");
+                    Console.WriteLine($"      技术指标: MACD(DIF:{trade.MacdDif:F3}, DEA:{trade.MacdDea:F3}, Histogram:{trade.MacdHistogram:F3}), " +
+                                    $"KDJ(K:{trade.KdjK:F2}, D:{trade.KdjD:F2}, J:{trade.KdjJ:F2}), " +
+                                    $"RSI:{trade.Rsi:F2}, MA(Short:{trade.MaShort:F2}, Long:{trade.MaLong:F2})");
                 }
                 
-                sw.WriteLine($"{lastMinutes[i].Date.ToString("yyyy-MM-dd")}\t{lastMinutesCloseArr[i].ToString()}\t{macdResultsPure1[i].Dif.ToString()}\t{macdResultsPure1[i].Dea.ToString()}\t{macdResultsPure1[i].Histogram.ToString()}\t{macdResultsPure1[i].Signal.ToString()}\t{divergenceType}\t{divergenceDescription}");
+                if (tradingResult.Trades.Count > 5)
+                {
+                    Console.WriteLine($"    ... 还有 {tradingResult.Trades.Count - 5} 笔交易");
+                }
+                
+                Console.WriteLine($"{config.Name}模拟完成。");
             }
+            
+            Console.WriteLine("\n所有策略组合模拟完成。");
+        }
 
-            // 调试输出
-            Console.WriteLine("准备执行交易模拟...");
-            Console.WriteLine($"分钟数据总数: {lastMinutes.Length}");
-            Console.WriteLine($"第一个数据点: {lastMinutes[0].Date}, 价格: {lastMinutes[0].Close}");
-            Console.WriteLine($"最后一个数据点: {lastMinutes[lastMinutes.Length - 1].Date}, 价格: {lastMinutes[lastMinutes.Length - 1].Close}");
-
-            // 运行交易模拟
-            Console.WriteLine("\n12. 交易模拟:");
-            var simulator = new TradingSimulator(100000m); // 初始资金10万元
-            Console.WriteLine("交易模拟器已创建，开始运行模拟...");
-            simulator.RunSimulation(lastMinutes.ToList());
-            Console.WriteLine("模拟运行完成，正在获取结果...");
-
-            var tradingResult = simulator.GetResult();
-            Console.WriteLine($"  初始资金: {tradingResult.InitialBalance:N2}");
-            Console.WriteLine($"  最终资金: {tradingResult.FinalBalance:N2}");
-            Console.WriteLine($"  盈亏金额: {tradingResult.Profit:N2}");
-            Console.WriteLine($"  盈亏比例: {tradingResult.ProfitPercentage:N2}%");
-            Console.WriteLine($"  总交易次数: {tradingResult.TotalTrades}");
-
-            Console.WriteLine("\n  交易记录:");
-            foreach (var trade in tradingResult.Trades)
-            {
-                string actionText = trade.Action == TradeAction.Buy ? "买入" : "卖出";
-                Console.WriteLine($"    {trade.DateTime:yyyy-MM-dd HH:mm} {actionText} 价格:{trade.Price:F2} 数量:{trade.Shares} 金额:{trade.Amount:N2} 余额:{trade.BalanceAfter:N2}");
-            }
-            Console.WriteLine("交易模拟完成。");
+        /// <summary>
+        /// 运行交易员系统示例
+        /// </summary>
+        private static async Task RunTraderSystemExample()
+        {
+            Console.WriteLine("\n运行交易员系统示例...");
+            await TraderSystemExample.RunAsync();
+            Console.WriteLine("交易员系统示例完成。");
+        }
+        
+        /// <summary>
+        /// 运行高级智能交易系统示例
+        /// </summary>
+        private static async Task RunAdvancedIntelligentTradingExample()
+        {
+            Console.WriteLine("\n运行高级智能交易系统示例...");
+            await AdvancedIntelligentTradingExample.RunAsync();
+            Console.WriteLine("高级智能交易系统示例完成。");
         }
 
         /// <summary>

@@ -6,337 +6,100 @@ using Lux.Indicators.DivergenceDetectors;
 using Lux.Indicators.MomentumIndicators;
 using Lux.Indicators.Models;
 using Lux.Indicators.TrendIndicators;
+using Lux.Indicators.Demo.Interfaces;
 
 namespace Lux.Indicators.Demo
 {
     /// <summary>
-    /// 交易模拟器类，用于模拟实盘交易
+    /// 重构后的交易模拟器类，用于模拟实盘交易
+    /// 遵循单一职责原则，将功能分解为不同的组件
     /// </summary>
     public class TradingSimulator
     {
         private readonly decimal _initialBalance;
         private decimal _currentBalance;
-        private decimal _currentPosition;
-        private decimal _positionValue;
+        private readonly PositionManager _positionManager; // 持仓管理器
         private readonly List<TradeRecord> _trades;
-        private readonly List<StockData> _dataList;
-        private readonly List<MacdOutput> _macdResults;
-        private readonly List<KdjOutput> _kdjResults;
-        private readonly List<MovingAverageOutput> _maResults;
-        private readonly List<decimal> _rsiResults;
+        private readonly IDataProcessor _dataProcessor;
+        private readonly ITradingSignalProcessor _signalProcessor;
+        private readonly ITradeExecutor _tradeExecutor;
 
-        public TradingSimulator(decimal initialBalance = 100000m)
+        public TradingSimulator(decimal initialBalance = 100000m, 
+            ITradingStrategy strategy = null, 
+            IPositionManagement positionManagement = null,
+            IDataProcessor dataProcessor = null,
+            ITradingSignalProcessor signalProcessor = null,
+            ITradeExecutor tradeExecutor = null)
         {
             _initialBalance = initialBalance;
             _currentBalance = initialBalance;
-            _currentPosition = 0;
-            _positionValue = 0;
+            _positionManager = new PositionManager();
             _trades = new List<TradeRecord>();
-            _dataList = new List<StockData>();
-            _macdResults = new List<MacdOutput>();
-            _kdjResults = new List<KdjOutput>();
-            _maResults = new List<MovingAverageOutput>();
-            _rsiResults = new List<decimal>();
+            
+            // 初始化各组件，实现职责分离并支持依赖注入
+            _dataProcessor = dataProcessor ?? new DataProcessor();
+            _signalProcessor = signalProcessor ?? new TradingSignalProcessor(
+                strategy ?? new ShortTermTradingStrategy());
+            _tradeExecutor = tradeExecutor ?? new TradeExecutor(_positionManager, _trades, 
+                strategy ?? new ShortTermTradingStrategy(), 
+                positionManagement ?? new BalancedPositionManagement());
         }
 
         /// <summary>
         /// 添加数据点并进行分析
         /// </summary>
-        public void AddDataPoint(StockData stockData)
+        public void AddDataPoint(StockData stockData, string stockCode = "UNKNOWN")
         {
-            _dataList.Add(stockData);
-
-            // 计算技术指标
-            UpdateIndicators();
-
-            // 检查交易信号
-            CheckTradingSignals();
+            // 处理单个数据点，通过组合模式委托给专门的处理器
+            ProcessSingleDataPoint(stockData, stockCode);
         }
 
         /// <summary>
-        /// 更新技术指标
+        /// 处理单个数据点
         /// </summary>
-        private void UpdateIndicators()
+        private void ProcessSingleDataPoint(StockData data, string stockCode = "UNKNOWN")
         {
-            // 提取最近的数据用于计算
-            var recentCount = Math.Min(_dataList.Count, 50);
-            var recentData = _dataList.TakeLast(recentCount).ToList();
-            var closePrices = recentData.Select(s => s.Close).ToList();
-            var highPrices = recentData.Select(s => s.High).ToList();
-            var lowPrices = recentData.Select(s => s.Low).ToList();
-
-            // 检查是否有有效的高低价格数据，如果没有则使用收盘价代替
-            bool hasValidHighLow = highPrices.All(h => h > 0) && lowPrices.All(l => l > 0);
+            // 使用数据处理器计算技术指标
+            var indicators = _dataProcessor.ProcessData(data);
             
-            // 计算MACD
-            MacdOutput macdOutput;
-            if (closePrices.Count < 26) 
-            {
-                // 如果数据不足，使用默认值
-                macdOutput = new MacdOutput { Dif = 0, Dea = 0, Histogram = 0, Signal = MacdSignalType.None };
-            }
-            else 
-            {
-                var macdResult = MacdAnalyzer.Analyze(closePrices, 12, 26, 9);
-                macdOutput = macdResult.Last();
-            }
-            _macdResults.Add(macdOutput);
-
-            // 计算KDJ - 如果没有有效的高低价格数据，则跳过或使用默认值
-            KdjOutput kdjOutput;
-            if (!hasValidHighLow || highPrices.Count < 9 || lowPrices.Count < 9 || closePrices.Count < 9) 
-            {
-                // 如果数据不足或无效，使用默认值
-                kdjOutput = new KdjOutput { K = 50, D = 50, J = 50, Signal = KdjSignalType.None };
-            }
-            else 
-            {
-                var kdjResult = KdjAnalyzer.Analyze(highPrices, lowPrices, closePrices, 9, 3, 3);
-                kdjOutput = kdjResult.Last();
-            }
-            _kdjResults.Add(kdjOutput);
-
-            // 计算移动平均线
-            MovingAverageOutput maOutput;
-            if (closePrices.Count < 10) 
-            {
-                // 如果数据不足，使用默认值
-                maOutput = new MovingAverageOutput { ShortMa = 0, LongMa = 0, Signal = MovingAverageSignalType.None };
-            }
-            else 
-            {
-                var maResult = MovingAverageAnalyzer.Analyze(closePrices, 5, 10);
-                maOutput = maResult.Last();
-            }
-            _maResults.Add(maOutput);
-
-            // 计算RSI
-            decimal rsiValue;
-            if (closePrices.Count < 15) // 需要14+1个数据点来计算RSI
-            {
-                // 如果数据不足，使用默认值
-                rsiValue = 50;
-            }
-            else 
-            {
-                var rsiResult = CalculateRsi(closePrices, 14);
-                rsiValue = rsiResult.Last();
-            }
-            _rsiResults.Add(rsiValue);
-        }
-
-        /// <summary>
-        /// 计算RSI
-        /// </summary>
-        private List<decimal> CalculateRsi(List<decimal> closePrices, int period)
-        {
-            var rsiValues = new List<decimal>();
-            if (closePrices.Count < period + 1)
-            {
-                // 初始化默认值
-                for (int i = 0; i < closePrices.Count; i++)
-                {
-                    rsiValues.Add(50);
-                }
-                return rsiValues;
-            }
-
-            for (int i = 0; i < closePrices.Count; i++)
-            {
-                if (i < period)
-                {
-                    rsiValues.Add(50); // 初始值
-                    continue;
-                }
-
-                decimal gainSum = 0;
-                decimal lossSum = 0;
-
-                for (int j = i - period + 1; j <= i; j++)
-                {
-                    decimal change = closePrices[j] - closePrices[j - 1];
-                    if (change > 0)
-                    {
-                        gainSum += change;
-                    }
-                    else
-                    {
-                        lossSum += Math.Abs(change);
-                    }
-                }
-
-                decimal avgGain = gainSum / period;
-                decimal avgLoss = lossSum / period;
-
-                if (avgLoss == 0)
-                {
-                    rsiValues.Add(100);
-                }
-                else
-                {
-                    decimal rs = avgGain / avgLoss;
-                    decimal rsi = 100 - (100 / (1 + rs));
-                    rsiValues.Add(rsi);
-                }
-            }
-
-            return rsiValues;
-        }
-
-        /// <summary>
-        /// 检查交易信号
-        /// </summary>
-        private void CheckTradingSignals()
-        {
-            int currentIndex = _dataList.Count - 1;
-
-            // 需要足够的数据点才能进行分析
-            if (currentIndex < 26) return;
-
-            var currentData = _dataList[currentIndex];
-            var currentMacd = _macdResults[currentIndex];
-            var currentKdj = _kdjResults[currentIndex];
-            var currentMa = _maResults[currentIndex];
-            var currentRsi = _rsiResults[currentIndex];
-
-            // 买入信号判断
-            if (IsBuySignal(currentIndex, currentData, currentMacd, currentKdj, currentMa, currentRsi))
-            {
-                ExecuteBuy(currentData);
-            }
-            // 卖出信号判断
-            else if (IsSellSignal(currentIndex, currentData, currentMacd, currentKdj, currentMa, currentRsi))
-            {
-                ExecuteSell(currentData);
-            }
-        }
-
-        /// <summary>
-        /// 判断买入信号
-        /// </summary>
-        private bool IsBuySignal(int index, StockData data, MacdOutput macd, KdjOutput kdj, MovingAverageOutput ma, decimal rsi)
-        {
-            // 条件1: MACD金叉 或 DIF > DEA 且 DIF > 0
-            bool macdCondition = macd.Signal == MacdSignalType.GoldenCross || 
-                                (macd.Dif > macd.Dea && macd.Dif > 0);
-
-            // 条件2: KDJ金叉 或 K > D 且 K < 80 (未超买)
-            bool kdjCondition = kdj.Signal == KdjSignalType.GoldenCross || 
-                               (kdj.K > kdj.D && kdj.K < 80);
-
-            // 条件3: 短期均线上穿长期均线 或 价格在均线上方
-            bool maCondition = ma.Signal == MovingAverageSignalType.Bullish || 
-                              (ma.ShortMa > ma.LongMa && data.Close > ma.ShortMa);
-
-            // 条件4: RSI > 30 且 RSI < 70 (非极端区域)
-            bool rsiCondition = rsi > 30 && rsi < 70;
-
-            // 综合判断：至少满足3个条件
-            int satisfiedConditions = (macdCondition ? 1 : 0) +
-                                    (kdjCondition ? 1 : 0) +
-                                    (maCondition ? 1 : 0) +
-                                    (rsiCondition ? 1 : 0);
-
-            return satisfiedConditions >= 3 && _currentPosition == 0; // 且当前无持仓
-        }
-
-        /// <summary>
-        /// 判断卖出信号
-        /// </summary>
-        private bool IsSellSignal(int index, StockData data, MacdOutput macd, KdjOutput kdj, MovingAverageOutput ma, decimal rsi)
-        {
-            // 条件1: MACD死叉 或 DIF < DEA 且 DIF < 0
-            bool macdCondition = macd.Signal == MacdSignalType.DeathCross || 
-                                (macd.Dif < macd.Dea && macd.Dif < 0);
-
-            // 条件2: KDJ死叉 或 K < D 且 K > 20 (未超卖)
-            bool kdjCondition = kdj.Signal == KdjSignalType.DeathCross || 
-                               (kdj.K < kdj.D && kdj.K > 20);
-
-            // 条件3: 短期均线下穿长期均线 或 价格在均线下方
-            bool maCondition = ma.Signal == MovingAverageSignalType.Bearish || 
-                              (ma.ShortMa < ma.LongMa && data.Close < ma.ShortMa);
-
-            // 条件4: RSI < 30 或 RSI > 70 (极端区域)
-            bool rsiCondition = rsi < 30 || rsi > 70;
-
-            // 综合判断：至少满足3个条件
-            int satisfiedConditions = (macdCondition ? 1 : 0) +
-                                    (kdjCondition ? 1 : 0) +
-                                    (maCondition ? 1 : 0) +
-                                    (rsiCondition ? 1 : 0);
-
-            return satisfiedConditions >= 3 && _currentPosition > 0; // 且当前持有仓位
-        }
-
-        /// <summary>
-        /// 执行买入操作
-        /// </summary>
-        private void ExecuteBuy(StockData data)
-        {
-            // 使用一半的资金买入
-            decimal amountToSpend = _currentBalance * 0.5m;
-            decimal sharesToBuy = Math.Floor(amountToSpend / data.Close);
+            // 使用信号处理器判断交易信号
+            var signal = _signalProcessor.GetTradingSignal(data, indicators, _positionManager, _currentBalance);
             
-            if (sharesToBuy > 0)
+            // 使用交易执行器执行交易
+            var result = _tradeExecutor.ExecuteTrade(data, indicators, signal, stockCode, ref _currentBalance);
+            
+            // 如果交易成功，更新交易记录
+            if (result.Success && result.TradeRecord != null)
             {
-                decimal cost = sharesToBuy * data.Close;
-                _currentBalance -= cost;
-                _currentPosition += sharesToBuy;
-                _positionValue = sharesToBuy * data.Close;
-
-                _trades.Add(new TradeRecord
-                {
-                    Action = TradeAction.Buy,
-                    DateTime = data.Date,
-                    Price = data.Close,
-                    Shares = sharesToBuy,
-                    Amount = cost,
-                    BalanceAfter = _currentBalance
-                });
-            }
-        }
-
-        /// <summary>
-        /// 执行卖出操作
-        /// </summary>
-        private void ExecuteSell(StockData data)
-        {
-            if (_currentPosition > 0)
-            {
-                decimal revenue = _currentPosition * data.Close;
-                _currentBalance += revenue;
-                decimal sharesSold = _currentPosition;
-                _currentPosition = 0;
-                _positionValue = 0;
-
-                _trades.Add(new TradeRecord
-                {
-                    Action = TradeAction.Sell,
-                    DateTime = data.Date,
-                    Price = data.Close,
-                    Shares = sharesSold,
-                    Amount = revenue,
-                    BalanceAfter = _currentBalance
-                });
+                _trades.Add(result.TradeRecord);
             }
         }
 
         /// <summary>
         /// 运行模拟交易
         /// </summary>
-        public void RunSimulation(List<StockData> dataList)
+        public void RunSimulation(List<StockData> dataList, string stockCode = "UNKNOWN")
         {
+            if (dataList == null || dataList.Count == 0) return;
+
+            // 逐个处理数据
             foreach (var data in dataList)
             {
-                AddDataPoint(data);
+                ProcessSingleDataPoint(data, stockCode);
             }
 
-            // 模拟结束时清空所有持仓
-            if (_currentPosition > 0)
+            // 模拟结束时清空指定股票的持仓
+            if (_positionManager.HasPosition(stockCode) && dataList.Any())
             {
                 var lastData = dataList.Last();
-                ExecuteSell(lastData);
+                var indicators = _dataProcessor.ProcessData(lastData);
+                var sellSignal = TradingSignal.Sell; // 强制平仓
+                var result = _tradeExecutor.ExecuteTrade(lastData, indicators, sellSignal, stockCode, ref _currentBalance);
+                
+                if (result.Success && result.TradeRecord != null)
+                {
+                    _trades.Add(result.TradeRecord);
+                }
             }
         }
 
@@ -345,7 +108,9 @@ namespace Lux.Indicators.Demo
         /// </summary>
         public SimulationResult GetResult()
         {
-            decimal finalBalance = _currentBalance + _positionValue; // 包括现金和持仓价值
+            // 计算最终持仓价值（使用最新的股票价格）
+            decimal positionValue = GetTotalPositionValue(null); // 使用最新的数据计算持仓价值
+            decimal finalBalance = _currentBalance + positionValue; // 包括现金和持仓价值
             decimal profit = finalBalance - _initialBalance;
             decimal profitPercentage = (_initialBalance != 0) ? (profit / _initialBalance) * 100 : 0;
 
@@ -359,40 +124,56 @@ namespace Lux.Indicators.Demo
                 Trades = _trades
             };
         }
-    }
 
-    /// <summary>
-    /// 交易记录
-    /// </summary>
-    public class TradeRecord
-    {
-        public TradeAction Action { get; set; }
-        public DateTime DateTime { get; set; }
-        public decimal Price { get; set; }
-        public decimal Shares { get; set; }
-        public decimal Amount { get; set; }
-        public decimal BalanceAfter { get; set; }
-    }
+        /// <summary>
+        /// 获取总持仓价值
+        /// </summary>
+        private decimal GetTotalPositionValue(List<StockData> dataList)
+        {
+            decimal totalValue = 0;
+            var allPositions = _positionManager.GetAllPositions();
+            
+            foreach (var position in allPositions.Values)
+            {
+                // 如果提供了数据列表，尝试使用最新价格计算持仓价值
+                if (dataList != null && dataList.Count > 0)
+                {
+                    // 使用最后一个数据点的价格作为当前价格
+                    var currentPrice = dataList[dataList.Count - 1].Close;
+                    totalValue += position.Shares * currentPrice;
+                }
+                else
+                {
+                    // 否则使用平均买入价格估算
+                    totalValue += position.Value;
+                }
+            }
+            
+            return totalValue;
+        }
 
-    /// <summary>
-    /// 交易动作枚举
-    /// </summary>
-    public enum TradeAction
-    {
-        Buy,
-        Sell
-    }
+        /// <summary>
+        /// 初始化持仓（用于继续交易时设置现有持仓）
+        /// </summary>
+        public void InitializePosition(string stockCode, decimal shares, decimal avgBuyPrice)
+        {
+            _positionManager.SetPosition(stockCode, shares, avgBuyPrice);
+        }
 
-    /// <summary>
-    /// 模拟结果
-    /// </summary>
-    public class SimulationResult
-    {
-        public decimal InitialBalance { get; set; }
-        public decimal FinalBalance { get; set; }
-        public decimal Profit { get; set; }
-        public decimal ProfitPercentage { get; set; }
-        public int TotalTrades { get; set; }
-        public List<TradeRecord> Trades { get; set; } = new List<TradeRecord>();
+        /// <summary>
+        /// 保存当前状态到文件
+        /// </summary>
+        public void SaveState(string filePath)
+        {
+            // 保存功能暂不实现
+        }
+
+        /// <summary>
+        /// 从文件加载状态
+        /// </summary>
+        public void LoadState(string filePath)
+        {
+            // 加载功能暂不实现
+        }
     }
 }
