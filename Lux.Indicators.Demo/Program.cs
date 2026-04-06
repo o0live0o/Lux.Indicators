@@ -16,6 +16,7 @@ using Lux.Indicators.Demo.Traders;
 using Lux.Indicators.Demo.Providers;
 using Lux.Indicators.Demo.Aggregation;
 using Lux.Indicators.Demo.Managers;
+using Lux.Indicators.Demo;
 
 namespace Lux.Indicators.Demo
 {
@@ -41,8 +42,11 @@ namespace Lux.Indicators.Demo
             // 运行技术指标分析测试
             // RunTechnicalAnalysisTests();
             
+            // 运行买卖点检测演示
+            BuySellDetectionDemo.Run();
+            
             // 运行日内交易模拟 - 使用最终交易中心版本
-            await RunIntradayTradingSimulation();
+            // await RunIntradayTradingSimulation();
 
             Console.WriteLine("\n计算完成！");
         }

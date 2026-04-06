@@ -9,15 +9,7 @@ using Lux.Indicators.TrendIndicators;
 
 namespace Lux.Indicators.Demo
 {
-    /// <summary>
-    /// 交易信号类型
-    /// </summary>
-    public enum TradingSignal
-    {
-        None,
-        Buy,
-        Sell
-    }
+
 
     /// <summary>
     /// 技术指标结果包装类
