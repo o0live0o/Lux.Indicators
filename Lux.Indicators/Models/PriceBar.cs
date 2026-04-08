@@ -10,25 +10,25 @@ public class PriceBar
     /// <summary>
     /// 开盘价
     /// </summary>
-    public decimal Open { get; set; }
+    public double Open { get; set; }
 
     /// <summary>
     /// 最高价
     /// </summary>
-    public decimal High { get; set; }
+    public double High { get; set; }
 
     /// <summary>
     /// 最低价
     /// </summary>
-    public decimal Low { get; set; }
+    public double Low { get; set; }
 
     /// <summary>
     /// 收盘价
     /// </summary>
-    public decimal Close { get; set; }
+    public double Close { get; set; }
 
     /// <summary>
     /// 成交量
     /// </summary>
-    public decimal Volume { get; set; }
+    public double Volume { get; set; }
 }

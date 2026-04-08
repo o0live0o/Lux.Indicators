@@ -12,12 +12,12 @@ public class MovingAverageResult
     /// <summary>
     /// 短期移动平均线值
     /// </summary>
-    public decimal ShortMa { get; set; }
+    public double ShortMa { get; set; }
 
     /// <summary>
     /// 长期移动平均线值
     /// </summary>
-    public decimal LongMa { get; set; }
+    public double LongMa { get; set; }
 }
 
 /// <summary>

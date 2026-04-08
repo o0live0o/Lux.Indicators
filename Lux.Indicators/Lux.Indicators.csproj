@@ -8,12 +8,12 @@
     <!-- NuGet Package Properties -->
     <PackageId>Lux.Indicators</PackageId>
     <PackageVersion>1.0.0</PackageVersion>
-    <Authors>Lux Team</Authors>
-    <Company>Lux</Company>
+    <Authors>Anonymous</Authors>
+    <Company>Anonymous</Company>
     <Description>A comprehensive technical indicators library for stock analysis, including MACD, KDJ, Bollinger Bands, and Moving Average calculations.</Description>
-    <Copyright>Copyright © Lux 2026</Copyright>
+    <Copyright>Copyright © Anonymous 2026</Copyright>
     <PackageTags>stock indicators;technical-analysis;financial-analysis;trading;finance;macd;kdj;bollinger-bands;moving-average</PackageTags>
-    <RepositoryUrl>https://github.com/lux/indicators</RepositoryUrl>
+    <RepositoryUrl>https://github.com/o0live0o/Lux.Indicators</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <IncludeSymbols>true</IncludeSymbols>

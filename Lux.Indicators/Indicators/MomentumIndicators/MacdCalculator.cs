@@ -9,7 +9,7 @@ namespace Lux.Indicators;
 /// <summary>
 /// MACD指标分析器
 /// </summary>
-public class MacdCalculator : ICalculator<MacdResult>
+public class MacdCalculator : IIndicatorCalculator<MacdResult>
 {
     private readonly MacdOptions _options;
     public MacdCalculator(MacdOptions? options = default)
@@ -18,14 +18,14 @@ public class MacdCalculator : ICalculator<MacdResult>
         _options.Validate();
     }
 
-    public IEnumerable<MacdResult> Calculate(List<PriceBar> prices)
+    public List<MacdResult> Calculate(IReadOnlyList<PriceBar> datas)
     {
-        if(prices is null || prices.Count() == 0)
+        ArgumentNullException.ThrowIfNull(datas);
+        if (datas.Count() == 0)
             return [];
 
-        var results = new List<MacdResult>();
 
-        var closePrices = prices.Select(p => p.Close).ToList();
+        var closePrices = datas.Select(p => p.Close).ToList();
 
         // 计算快速EMA
         var fastEMA = IndicatorCalculator.CalculateEMA(closePrices, _options.FastPeriod);
@@ -34,7 +34,7 @@ public class MacdCalculator : ICalculator<MacdResult>
         var slowEMA = IndicatorCalculator.CalculateEMA(closePrices, _options.SlowPeriod);
 
         // 计算DIF线 (快速EMA - 慢速EMA)
-        var difValues = new List<decimal>();
+        var difValues = new List<double>();
         for (int i = 0; i < closePrices.Count; i++)
         {
             // 只有当两个EMA都有有效值时才计算DIF
@@ -52,6 +52,7 @@ public class MacdCalculator : ICalculator<MacdResult>
         // 计算DEA线 (DIF的EMA)
         var deaValues = IndicatorCalculator.CalculateEMA(difValues, _options.SignalPeriod);
 
+        var results = new List<MacdResult>();
         // 计算MACD柱状图及信号
         for (int i = 0; i < closePrices.Count; i++)
         {
@@ -63,7 +64,7 @@ public class MacdCalculator : ICalculator<MacdResult>
 
             results.Add(new MacdResult
             {
-                Date = prices[i].Date,
+                Date = datas[i].Date,
                 Dif = dif,
                 Dea = dea,
                 Histogram = histogram

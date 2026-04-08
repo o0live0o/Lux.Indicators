@@ -12,17 +12,17 @@ public class KdjResult
     /// <summary>
     /// K值
     /// </summary>
-    public decimal K { get; set; }
+    public double K { get; set; }
 
     /// <summary>
     /// D值
     /// </summary>
-    public decimal D { get; set; }
+    public double D { get; set; }
 
     /// <summary>
     /// J值
     /// </summary>
-    public decimal J { get; set; }
+    public double J { get; set; }
 }
 
 /// <summary>

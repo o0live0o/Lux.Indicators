@@ -9,25 +9,27 @@ public class BollingerBandsResult
 {
     public DateTime Date { get; set; }
 
+    public double Close { get; set; }
+
     /// <summary>
     /// 中轨线 (MA)
     /// </summary>
-    public decimal MiddleBand { get; set; }
+    public double MiddleBand { get; set; }
 
     /// <summary>
     /// 上轨线 (MB + k * 标准差)
     /// </summary>
-    public decimal UpperBand { get; set; }
+    public double UpperBand { get; set; }
 
     /// <summary>
     /// 下轨线 (MB - k * 标准差)
     /// </summary>
-    public decimal LowerBand { get; set; }
+    public double LowerBand { get; set; }
 
     /// <summary>
     /// 布林带宽度
     /// </summary>
-    public decimal BandWidth { get; set; }
+    public double BandWidth { get; set; }
 }
 
 /// <summary>

@@ -12,17 +12,17 @@ public class MacdResult
     /// <summary>
     /// DIF线 (快速EMA - 慢速EMA)
     /// </summary>
-    public decimal Dif { get; set; }
+    public double Dif { get; set; }
 
     /// <summary>
     /// DEA线 (DIF的平滑移动平均)
     /// </summary>
-    public decimal Dea { get; set; }
+    public double Dea { get; set; }
 
     /// <summary>
     /// MACD柱状图 (2 * (DIF - DEA))
     /// </summary>
-    public decimal Histogram { get; set; }
+    public double Histogram { get; set; }
 
 }
 

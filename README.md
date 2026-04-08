@@ -42,9 +42,9 @@ class Program
     static void Main()
     {
         // 准备股票数据
-        List<decimal> closePrices = new List<decimal> { /* 收盘价序列 */ };
-        List<decimal> highPrices = new List<decimal> { /* 最高价序列 */ };
-        List<decimal> lowPrices = new List<decimal> { /* 最低价序列 */ };
+        List<double> closePrices = new List<double> { /* 收盘价序列 */ };
+        List<double> highPrices = new List<double> { /* 最高价序列 */ };
+        List<double> lowPrices = new List<double> { /* 最低价序列 */ };
 
         // 分析MACD (使用默认参数)
         var macdResults = MacdAnalyzer.Analyze(closePrices);

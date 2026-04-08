@@ -6,7 +6,7 @@ using Lux.Indicators.Options;
 
 namespace Lux.Indicators;
 
-public class BollingerBandsCalculator : ICalculator<BollingerBandsResult>
+public class BollingerBandsCalculator : IIndicatorCalculator<BollingerBandsResult>
 {
     private readonly BollingerBandsOptions _options;
 
@@ -16,20 +16,22 @@ public class BollingerBandsCalculator : ICalculator<BollingerBandsResult>
         _options.Validate();
     }
 
-    public IEnumerable<BollingerBandsResult> Calculate(List<PriceBar> prices)
+    public List<BollingerBandsResult> Calculate(IReadOnlyList<PriceBar> datas)
     {
-        if (prices is null || prices.Count() == 0)
+        ArgumentNullException.ThrowIfNull(datas);
+        if (datas.Count() == 0)
             return [];
-            
-        var results = new List<BollingerBandsResult>();
 
-        var closePrices = prices.Select(p => p.Close).ToList();
+
+        var closePrices = datas.Select(p => p.Close).ToList();
 
         // 计算移动平均线 (中轨)
         var maValues = IndicatorCalculator.CalculateSMA(closePrices, _options.Period);
 
         // 计算标准差
         var stdDevValues = IndicatorCalculator.CalculateStandardDeviation(closePrices, _options.Period);
+
+        var results = new List<BollingerBandsResult>();
 
         // 计算上下轨
         for (int i = 0; i < closePrices.Count; i++)
@@ -40,11 +42,11 @@ public class BollingerBandsCalculator : ICalculator<BollingerBandsResult>
             var lowerBand = middleBand - _options.StdDevMultiplier * stdDev; // 下轨
 
             // 计算布林带宽度
-            var bandWidth = middleBand != 0 ? (upperBand - lowerBand) / middleBand * 100m : 0m; // 以百分比表示，避免除零错误
+            var bandWidth = middleBand != 0 ? (upperBand - lowerBand) / middleBand * 100d : 0d; // 以百分比表示，避免除零错误
 
             results.Add(new BollingerBandsResult
             {
-                Date = prices[i].Date,
+                Date = datas[i].Date,
                 MiddleBand = middleBand,
                 UpperBand = upperBand,
                 LowerBand = lowerBand,

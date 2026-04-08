@@ -1,17 +1,22 @@
 
 using Lux.Indicators;
+using Lux.Indicators.Options;
 
-public class MovingAverageDetector : IDetector<MacdResult>
+public class MovingAverageDetector : IDetector<MovingAverageResult>
 {
-    public void Detect(List<MacdResult> inputs)
+    private readonly Lazy<MovingAverageCalculator> _calculator;
+    public MovingAverageDetector(MovingAverageOptions? options = default)
+    {
+        _calculator = new Lazy<MovingAverageCalculator>(() => new MovingAverageCalculator(options ?? new MovingAverageOptions()));
+    }
+
+    public List<Signal> Detect(IReadOnlyList<MovingAverageResult> datas)
     {
         throw new NotImplementedException();
     }
 
-    public void Detect(List<PriceBar> prices)
+    public List<Signal> Detect(IReadOnlyList<PriceBar> datas)
     {
-        MacdCalculator calculator = new MacdCalculator();
-        var result = calculator.Calculate(prices);
-        Detect(result.ToList());
+        return Detect(_calculator.Value.Calculate(datas));
     }
 }

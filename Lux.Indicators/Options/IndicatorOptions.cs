@@ -85,7 +85,7 @@ public class BollingerBandsOptions
     /// <summary>
     /// 标准差倍数，默认2
     /// </summary>
-    public decimal StdDevMultiplier { get; set; } = 2m;
+    public double StdDevMultiplier { get; set; } = 2d;
 
     /// <summary>
     /// 验证配置参数

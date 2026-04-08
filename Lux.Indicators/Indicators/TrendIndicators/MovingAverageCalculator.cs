@@ -9,7 +9,7 @@ namespace Lux.Indicators;
 /// <summary>
 /// 移动平均线分析器
 /// </summary>
-public class MovingAverageCalculator : ICalculator<MovingAverageResult>
+public class MovingAverageCalculator : IIndicatorCalculator<MovingAverageResult>
 {
     private readonly MovingAverageOptions _options;
     public MovingAverageCalculator(MovingAverageOptions? options = null)
@@ -18,36 +18,28 @@ public class MovingAverageCalculator : ICalculator<MovingAverageResult>
         _options.Validate();
     }
 
-    public IEnumerable<MovingAverageResult> Calculate(List<PriceBar> prices)
+    public List<MovingAverageResult> Calculate(IReadOnlyList<PriceBar> datas)
     {
-        if (prices is null || prices.Count() == 0)
+        ArgumentNullException.ThrowIfNull(datas);
+        if (datas.Count() == 0)
             return [];
 
-        var results = new List<MovingAverageResult>();
 
-        var closePrices = prices.Select(p => p.Close).ToList();
-        if (closePrices == null || closePrices.Count == 0)
-        {
-            return [];
-        }
-
+        var closePrices = datas.Select(p => p.Close).ToList();
         // 计算短期移动平均线
         var shortMaValues = IndicatorCalculator.CalculateSMA(closePrices, _options.ShortPeriod);
-
         // 计算长期移动平均线
         var longMaValues = IndicatorCalculator.CalculateSMA(closePrices, _options.LongPeriod);
 
         // 生成结果
+        var results = new List<MovingAverageResult>();
         for (int i = 0; i < closePrices.Count; i++)
         {
-            var shortMa = shortMaValues[i];
-            var longMa = longMaValues[i];
-
             results.Add(new MovingAverageResult
             {
-                Date = prices[i].Date,
-                ShortMa = shortMa,
-                LongMa = longMa,
+                Date = datas[i].Date,
+                ShortMa = shortMaValues[i],
+                LongMa = longMaValues[i],
             });
         }
 
